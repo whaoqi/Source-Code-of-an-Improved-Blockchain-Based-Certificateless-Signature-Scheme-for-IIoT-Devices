@@ -1,176 +1,148 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <string.h>
 #include "pbc/pbc.h"
 #include "pbc/pbc_test.h"
 #include <openssl/md5.h>
 
-#define N_ATTR 5
+// Number of cycle calculations
+#define N_ATTR 1000
 
-pairing_t pairing;
-element_t x, y, a, b, r, r2, base, S, R;
-element_t exponent, mul_res_Z, add_res_Z, exp_res_Z, hash_res, add_res_G, mul_res_G, exp_res_G, P, inv_res, hash_res_G;
-
-const int n = 1000;
-const int N = 200;
-int i, j;
-int processes;
-double t_start, t_finish;
-
-typedef struct TimesGZ_struct
+// Storage the calculation results for different operation times
+typedef struct Times_struct
 {
     double mul_Z;
     double inv_Z;
     double add_Z;
-    double exp_Z;
     double hash;
     double add_G;
     double mul_G;
-    double exp_G;
-} TimesGZ;
+} TimesStore;
 
-TimesGZ times_GZ;
+TimesStore times_Res;
 
 int main(int argc, char **argv)
 {
-
+    // Define a paired type variable
+    pairing_t pairing;
     pbc_demo_pairing_init(pairing, argc, argv);
+    // Define elements of an algebraic structure
+    element_t a, b, x, y;
+    element_t mul_res_Z, inv_res_Z, add_res_Z, add_res_G, mul_res_G;
 
-    element_init_G1(P, pairing);
-    element_init_G1(add_res_G, pairing);
-    element_init_G1(mul_res_G, pairing);
-    element_init_G1(exp_res_G, pairing);
-    element_init_G1(exp_res_Z, pairing);
-    element_init_G1(S, pairing);
-    element_init_G1(R, pairing);
-    element_init_G1(hash_res_G, pairing);
-
-    element_init_G2(y, pairing);
-
-    element_init_GT(r, pairing);
-    element_init_GT(r2, pairing);
-
-    element_init_Zr(exponent, pairing);
-    element_init_Zr(base, pairing);
-    element_init_Zr(hash_res, pairing);
+    // Initialize the variable to the element in the ring Zr
     element_init_Zr(mul_res_Z, pairing);
+    element_init_Zr(inv_res_Z, pairing);
     element_init_Zr(add_res_Z, pairing);
-    element_init_Zr(exp_res_Z, pairing);
     element_init_Zr(a, pairing);
     element_init_Zr(b, pairing);
 
-    element_init_Zr(inv_res, pairing);
-    element_init_Zr(x, pairing);
-    //存储md5的hex结果
-    unsigned char MD5ans[16] = {0};
+    // Initialize the variable to an element in group G1
+    element_init_G1(add_res_G, pairing);
+    element_init_G1(mul_res_G, pairing);
+    element_init_G1(x, pairing);
+    element_init_G1(y, pairing);
 
-    // 1 process
-    t_start = pbc_get_time();
-
-    double ttotalmul_Z = 0.0;
-    double ttotalinv_Z = 0.0;
-    double ttotaladd_Z = 0.0;
-    double ttotalexp_Z = 0.0;
-    double ttotalhash = 0.0;
-    double ttotaladd_G = 0.0;
-    double ttotalexp_G = 0.0;
-    double ttotalmul_G = 0.0;
-
-    double t0, t1;
-
-    element_random(P);
+    // Randomly select an element of the group or ring and assign it to a variable
     element_random(a);
     element_random(b);
     element_random(x);
     element_random(y);
-    element_random(S);
-    element_random(R);
-    element_random(exponent);
-    element_random(base);
 
-    for (i = 0; i < n; i++)
+    // Define start time, end time, total time for each calculation
+    double t0, t1;
+    double totalmul_Z = 0.0;
+    double totalinv_Z = 0.0;
+    double totaladd_Z = 0.0;
+    double totalhash = 0.0;
+    double totaladd_G = 0.0;
+    double totalmul_G = 0.0;
+
+    // Repeat the calculation N_ATTR times
+    for (int i = 0; i < N_ATTR; i++)
     {
 
         // evaluating time for multiplication in Z_p
         t0 = pbc_get_time();
-        element_mul(mul_res_Z, a, b); // mul_res_Z = a * b
+        // mul_res_Z = a * b
+        element_mul(mul_res_Z, a, b);
         t1 = pbc_get_time();
         // element_printf("%B = %B * %B\n\n", mul_res_Z, a, b);
-        ttotalmul_Z += t1 - t0;
+        totalmul_Z += t1 - t0;
 
         // evaluating time for invert in Z_p
         t0 = pbc_get_time();
-        element_invert(inv_res, a); // Set 'inv_res' to the inverse of 'a'.
+        // Set 'inv_res_Z' to the inverse of 'a'.
+        element_invert(inv_res_Z, a);
         t1 = pbc_get_time();
-        // element_mul(mul_res_Z, inv_res, a);
-        // element_printf("%B \n\n", inv_res);
-        ttotalinv_Z += t1 - t0;
+        // element_mul(mul_res_Z, inv_res_Z, a);
+        // element_printf("%B \n\n", mul_res_Z);
+        totalinv_Z += t1 - t0;
 
         // evaluating time for addition in Z_p
         t0 = pbc_get_time();
-        element_add(add_res_Z, a, b); // add_res_Z = a + b
+        // add_res_Z = a + b
+        element_add(add_res_Z, a, b);
         t1 = pbc_get_time();
-        ttotaladd_Z += t1 - t0;
+        // element_printf("%B = %B + %B\n\n", add_res_Z, a, b);
+        totaladd_Z += t1 - t0;
 
-        // evaluating time for General hash function
+        // evaluating time for General hash function, take MD5 as an example
         t0 = pbc_get_time();
         unsigned char *data = "123";
         unsigned char md[16];
         unsigned long n = 3;
         unsigned char *MD5(const unsigned char *data, unsigned long n, unsigned char *md);
         t1 = pbc_get_time();
-        ttotalhash += t1 - t0;
+        totalhash += t1 - t0;
 
         // evaluating time for addition in G
         t0 = pbc_get_time();
-        element_add(add_res_G, S, R); // add_res_G = x + y
+        // add_res_G = x + y
+        element_add(add_res_G, x, y);
         t1 = pbc_get_time();
-        // element_printf("S = %B\n\n", S);
-        // element_printf("R = %B\n\n", R);
-        // element_printf("add_res_G = %B\n\n", add_res_G);
-        ttotaladd_G += t1 - t0;
+        // element_printf("%B = %B + %B\n\n", add_res_G, x, y);
+        totaladd_G += t1 - t0;
 
         // evaluating time for multiplication in G
         t0 = pbc_get_time();
-        element_mul_zn(mul_res_G, P, x); // mul_res_G = x * y
+        // mul_res_G = x * a
+        element_mul_zn(mul_res_G, x, a);
         t1 = pbc_get_time();
-        // element_printf("%B = %B * %B\n\n", mul_res_G, P, x);
-        ttotalmul_G += t1 - t0;
-
-        // element_printf("x = %B\n", x);
-        // element_printf("y = %B\n", y);
-        // element_printf("e(x,y) = %B\n", r);
+        // element_printf("%B = %B * %B\n\n", mul_res_G, x, a);
+        totalmul_G += t1 - t0;
     }
 
-    times_GZ.mul_Z = ttotalmul_Z / n;
-    times_GZ.inv_Z = ttotalinv_Z / n;
-    times_GZ.add_Z = ttotaladd_Z / n;
-    times_GZ.exp_Z = ttotalexp_Z / n;
-    times_GZ.hash = ttotalhash / n;
-    times_GZ.add_G = ttotaladd_G / n;
-    times_GZ.mul_G = ttotalmul_G / n;
-    times_GZ.exp_G = ttotalexp_G / n;
+    // Divide by total number of times to calculate single time
+    times_Res.mul_Z = totalmul_Z / N_ATTR;
+    times_Res.inv_Z = totalinv_Z / N_ATTR;
+    times_Res.add_Z = totaladd_Z / N_ATTR;
+    times_Res.hash = totalhash / N_ATTR;
+    times_Res.add_G = totaladd_G / N_ATTR;
+    times_Res.mul_G = totalmul_G / N_ATTR;
 
-    t_finish = pbc_get_time();
+    double tmm = times_Res.mul_Z * 1000;
+    double tinv = times_Res.inv_Z * 1000;
+    double tma = times_Res.add_Z * 1000;
+    double th = times_Res.hash * 1000;
+    double tpa = times_Res.add_G * 1000;
+    double tpm = times_Res.mul_G * 1000;
 
+    // Results
     printf("EXECUTION TIME OF CRYPTOGRAPHIC OPERATION\n");
-    printf("Tmm: %.7f ms\n", times_GZ.mul_Z * 1000);
-    printf("Tinv: %.7f ms\n", times_GZ.inv_Z * 1000);
-    printf("Tma: %.7f ms\n", times_GZ.add_Z * 1000);
-    printf("Th: %.7f ms\n", times_GZ.hash * 1000);
-    printf("Tpa: %.7f ms\n", times_GZ.add_G * 1000);
-    printf("Tpm: %.7f ms\n", times_GZ.mul_G * 1000);
+    printf("+------+--------------+\n");
+    printf("| Tmm  | %.7f ms |\n", tmm);
+    printf("+------+--------------+\n");
+    printf("| Tinv | %.7f ms |\n", tinv);
+    printf("+------+--------------+\n");
+    printf("| Tma  | %.7f ms |\n", tma);
+    printf("+------+--------------+\n");
+    printf("| Th   | %.7f ms |\n", th);
+    printf("+------+--------------+\n");
+    printf("| Tpa  | %.7f ms |\n", tpa);
+    printf("+------+--------------+\n");
+    printf("| Tpm  | %.7f ms |\n", tpm);
+    printf("+------+--------------+\n");
 
-    double tmm = times_GZ.mul_Z * 1000;
-    double tinv = times_GZ.inv_Z * 1000;
-    double tma = times_GZ.add_Z * 1000;
-    double th = times_GZ.hash * 1000;
-    double tpa = times_GZ.add_G * 1000;
-    double tpm = times_GZ.mul_G * 1000;
-
+    /* we analyze all the above-mentioned schemes regarding the signature generation and verification process,
+    then calculate the time cost.*/
     printf("\nIn Gong scheme:\n");
     printf("The time to generate a signature is %.7f ms\n", tpm + 2 * th + 2 * tmm + 2 * tma);
     printf("The time to verify a signature is %.7f ms\n\n", 4 * tpm + 3 * tpa + 3 * th);
@@ -199,22 +171,16 @@ int main(int argc, char **argv)
     printf("The time to generate a signature is %.7f ms\n", tpm + 2 * th + 2 * tmm + 2 * tma);
     printf("The time to verify a signature is %.7f ms\n\n", 4 * tpm + 3 * tpa + 3 * th);
 
-    element_clear(x);
-    element_clear(y);
+    // Clear variables and release occupied resources
     element_clear(a);
     element_clear(b);
-    element_clear(r);
-    element_clear(r2);
+    element_clear(x);
+    element_clear(y);
     element_clear(mul_res_Z);
+    element_clear(inv_res_Z);
     element_clear(add_res_Z);
-    element_clear(exp_res_Z);
-    element_clear(hash_res);
     element_clear(add_res_G);
     element_clear(mul_res_G);
-    element_clear(exp_res_G);
-    element_clear(exponent);
-    element_clear(base);
-
     pairing_clear(pairing);
 
     return 0;
