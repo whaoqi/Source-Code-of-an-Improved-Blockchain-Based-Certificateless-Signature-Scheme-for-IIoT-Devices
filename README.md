@@ -3,5 +3,6 @@
 #### 1. To run these codes, you should install PBC, openssl, firstly.
 #### 2. The compile command and relative literature are all included in each .c file, respectively.
 #### 3. The target of ComputeTime.c is to measure operations' time consumption.
+#### 4. ./ComputeTime < ./a.param
 Result
 ![image](./res.png) 
