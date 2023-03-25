@@ -5,4 +5,5 @@
 #### 3. The target of ComputeTime.c is to measure operations' time consumption.
 #### 4. ./ComputeTime < ./a.param
 Result
-![image](./res.png) 
+![image](./pic1.png) 
+![image](./pic2.png) 
